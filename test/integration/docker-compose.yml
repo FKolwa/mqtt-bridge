@@ -1,0 +1,32 @@
+version: "3.1"
+services:
+  mqtt-broker:
+    image: eclipse-mosquitto@sha256:d6d255052b779cdc704418710d30638bf387e6d8e4e707feb6a7a580e184b748
+    volumes:
+      - ../fixtures/mosquitto.conf:/mosquitto/config/mosquitto.conf
+    hostname: mqtt-broker
+    networks:
+      - test-network
+  http-server:
+    image: clue/json-server@sha256:955daef288324b1d7b3f51c580b2978d66485dd3a65b75eb718b9bb35d893f1a
+    hostname: http-server
+    volumes:
+      - ../fixtures/db.json:/data/db.json
+    networks:
+      - test-network
+  mqtt-bridge:
+    image: node@sha256:e9af1806eba0b0c767e6adc1257eb8d1e78f88cbf89a0921f15f32bb01478322
+    volumes:
+      - ../../:/app
+    working_dir: /app
+    networks:
+      - test-network
+    depends_on:
+      - mqtt-broker
+      - http-server
+    command: >
+      sh -c 'node_modules/.bin/mocha test/integration/*.js --timeout 10000 --colors --exit'
+
+networks:
+  test-network:
+    external: false
