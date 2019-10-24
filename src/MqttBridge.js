@@ -2,67 +2,105 @@ const mqtt = require('mqtt')
 const axios = require('axios')
 
 class MqttBridge {
-  constructor (mqttHost = 'mqtt://localhost', httpHost = 'https://localhost', topics = [], options = {}) {
+  constructor () {
+    this._mqttHost = ''
+    this._httpHost = ''
+    this._routingTable = new Map()
+    this._client = {}
+    this._state = {
+      mqttConnected: false,
+      httpConnected: false
+    }
+  }
+
+  async connect (mqttHost = 'mqtt://localhost', httpHost = 'https://localhost', options = {}) {
+    this._mqttHost = mqttHost
     this._httpHost = httpHost
-    this._routingTable = {}
-    this._client = mqtt.connect(mqttHost, options)
-    this._client.on('connect', () => this._connectionHandler(topics))
-    this._client.on('message', (topic, payload) => this._messageHandler(topic, payload))
-  }
-
-  addRoute (_topic, _route, _method, _callback = undefined) {
-    this._routingTable[_topic] = {
-      route: _route,
-      method: _method,
-      callback: _callback
-    }
-  }
-
-  subscribe (topic) {
-    console.log(`Subscribing to: ${topic}`)
-    this._client.subscribe(topic, (error) => {
-      if (error) {
-        console.log(`Encountered a problem subscribing to ${topic}: ` + error)
-      } else {
-        console.log(`Subscribing to ${topic}: Success!`)
-      }
-    })
-  }
-
-  _connectionHandler (topics) {
-    topics.forEach(topic => {
-      this.subscribe(topic)
-    })
-  }
-
-  async _messageHandler (topic, payload) {
-    const body = {
-      method: this._routingTable[topic].method === undefined
-        ? 'get'
-        : this._routingTable[topic].method,
-      url: this._routingTable[topic].route === undefined
-        ? `${this._httpHost}/${topic}`
-        : this._routingTable[topic].route
-    }
-
-    if (body.method === 'post') {
-      body.data = { ...JSON.parse(payload) }
+    try {
+      this._client = await mqtt.connect(this._mqttHost, options)
+      this._client.on('connect', () => this._connectionHandler())
+      this._client.on('message', (topic, payload) => this._messageHandler(topic, payload))
+      this._client.on('error', (error) => this._errorHandler(error))
+    } catch (error) {
+      console.error(`Error connecting to to ${mqttHost}: ${error}`)
     }
 
     try {
-      const response = await axios({
-        ...body
-      })
-      if (body.method === 'get' && this._routingTable[topic].callback !== undefined) {
-        try {
-          this._routingTable[topic].callback(topic, response.data)
-        } catch (error) {
-          console.log(`Error during callback execution: ${error}`)
-        }
-      }
+      await axios.get(this._httpHost)
+      this._state.httpConnected = true
+      console.debug('HTTP connection established!')
     } catch (error) {
-      console.log(`Encountered a problem reaching target ${this._httpHost}/${topic}: ` + error)
+      console.error(`Error connecting to to ${this._httpHost}: ${error}`)
     }
+    return this._state.mqttConnected && this._state.httpConnected
+  }
+
+  addRoute (topic, route, options = {}) {
+    this._routingTable[topic] = {
+      route: route,
+      responseTopic: options.responseTopic !== undefined ? options.responseTopic : `${topic}/response`,
+      method: options.method !== undefined ? options.method : 'get',
+      callback: options.callback !== undefined ? options.callback : this._defaultCallback
+    }
+  }
+
+  getRoutes () {
+    return this._routingTable
+  }
+
+  subscribe (topics) {
+    for (const topic of topics) {
+      console.debug(`Subscribing to: ${topic}`)
+      this._client.subscribe(topic, (error) => {
+        if (error) {
+          console.error(`Error subscribing to ${topic}: ${error}`)
+        } else {
+          console.debug(`Subscribing to ${topic}: Success!`)
+        }
+      })
+    }
+  }
+
+  _connectionHandler () {
+    console.info('MQTT Connection established!')
+    this._state.mqttConnected = true
+  }
+
+  async _messageHandler (topic, payload) {
+    if (this._routingTable[topic] === undefined) {
+      console.error(`Error: no route found for topic ${topic}!`)
+    } else {
+      const body = {
+        method: this._routingTable[topic].method,
+        url: this._routingTable[topic].route
+      }
+
+      if (body.method === 'post' ||
+          body.method === 'put' ||
+          body.method === 'delete') {
+        body.data = { ...JSON.parse(payload) }
+      }
+
+      try {
+        const response = await axios({
+          ...body
+        })
+        if (body.method === 'get') {
+          this._routingTable[topic].callback(this._client, this._routingTable[topic].responseTopic, response.data)
+        }
+      } catch (error) {
+        console.error(`Error reaching target ${body.url}: ${error}`)
+      }
+    }
+  }
+
+  _errorHandler (error) {
+    console.error(`Error: ${error}`)
+  }
+
+  async _defaultCallback (mqttClient, topic, payload) {
+    console.debug(`Publishing response on topic ${topic}`)
+    await mqttClient.publish(topic, JSON.stringify(payload))
   }
 }
 

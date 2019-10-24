@@ -2,9 +2,9 @@
   "name": "mqtt-bridge",
   "version": "0.0.1",
   "description": "A MQTT to REST bridge.",
-  "main": "index.js",
+  "main": "sampleApp.js",
   "scripts": {
-    "test": "./test/test.sh"
+    "test": "./test.sh"
   },
   "repository": {
     "type": "git",
@@ -12,8 +12,7 @@
   },
   "keywords": [
     "MQTT",
-    "REST",
-    "SMARTHOME"
+    "REST"
   ],
   "author": "Felix Kolwa",
   "license": "MIT",
