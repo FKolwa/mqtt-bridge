@@ -1,23 +1,43 @@
 const mqtt = require('mqtt')
 const axios = require('axios')
+const yaml = require('js-yaml')
+const fs = require('fs')
 
 class MqttBridge {
   constructor () {
     this._mqttHost = ''
+    this._mqttOptions = {}
     this._httpHost = ''
     this._routingTable = new Map()
     this._client = {}
     this._state = {
+      config: {},
       mqttConnected: false,
       httpConnected: false
     }
   }
 
-  async connect (mqttHost = 'mqtt://localhost', httpHost = 'https://localhost', options = {}) {
+  async connectWithConfig (configPath) {
+    try {
+      this._state.config = yaml.safeLoad(fs.readFileSync(configPath, 'utf8'))
+    } catch (error) {
+      console.error(`Error loading config file from ${configPath}: ${error}`)
+    }
+    const mqttHost = this._state.config.mqttHost ? this._state.config.mqttHost : ''
+    const mqttOptions = this._state.config.mqttOptions ? this._state.config.mqttOptions : {}
+    const httpHost = this._state.config.httpHost ? this._state.config.httpHost : ''
+    const connected = await this.connect(mqttHost, httpHost, mqttOptions)
+    if (connected) {
+      this._routingTable = this._state.config.routes ? this._routesFromConfig(this._state.config.routes) : new Map()
+    }
+  }
+
+  async connect (mqttHost = 'mqtt://localhost', httpHost = 'http://localhost', options = {}) {
     this._mqttHost = mqttHost
     this._httpHost = httpHost
+    this._mqttOptions = options
     try {
-      this._client = await mqtt.connect(this._mqttHost, options)
+      this._client = await mqtt.connect(this._mqttHost, this._mqttOptions)
       this._client.on('connect', () => this._connectionHandler())
       this._client.on('message', (topic, payload) => this._messageHandler(topic, payload))
       this._client.on('error', (error) => this._errorHandler(error))
@@ -59,6 +79,20 @@ class MqttBridge {
         }
       })
     }
+  }
+
+  _routesFromConfig (config) {
+    const routingTable = new Map()
+    for (const item in config) {
+      this.subscribe([item])
+      routingTable[item] = {
+        route: config[item].route,
+        responseTopic: config[item].responseTopic !== undefined ? config[item].responseTopic : `${item}/response`,
+        method: config[item].method !== undefined ? config[item].method : 'get',
+        callback: config[item].callback !== undefined ? config[item].callback : this._defaultCallback
+      }
+    }
+    return routingTable
   }
 
   _connectionHandler () {
