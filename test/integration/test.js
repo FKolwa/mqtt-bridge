@@ -21,74 +21,22 @@ describe('MqttBridge integration test', () => {
       mqttClientHost.client.subscribe('test/comments/response')
       mqttClientHost.client.subscribe('test/users/response')
       mqttClientHost.client.subscribe('test/orange/overwrite/response')
+      mqttClientHost.client.subscribe('test/dynamic/response')
     })
     mqttClientHost.client.on('message', (topic, payload) => {
       const topicName = topic.split('/')[1]
       mqttClientHost.responses[topicName] = JSON.parse(payload)
       mqttClientHost.count += 1
     })
+
+    // init mqtt bridge
+    mqttBridge = new MqttBridge()
+    await mqttBridge.connect('mqtt://mqtt-broker')
   })
 
   describe('Given a running mqtt-client, broker and http-server', () => {
-    it('should be possible setup MqttBridge instance', async () => {
-      mqttBridge = new MqttBridge()
-      // test connection
-      const connected = await mqttBridge.connect(
-        'mqtt://mqtt-broker',
-        'http://http-server'
-      )
-      assert.isTrue(connected)
-    })
-
-    it('should be possible subscribe and create routes', async () => {
-      mqttBridge.subscribe([
-        'test/posts/post',
-        'test/comments/post',
-        'test/users/post',
-        'test/posts/get',
-        'test/comments/get',
-        'test/users/get'
-      ])
-      mqttBridge.addRoute(
-        'test/posts/post',
-        'http://http-server/posts',
-        { method: 'post' }
-      )
-      mqttBridge.addRoute(
-        'test/comments/post',
-        'http://http-server/comments',
-        { method: 'post' }
-      )
-      mqttBridge.addRoute(
-        'test/users/post',
-        'http://http-server/users',
-        { method: 'post' }
-      )
-
-      mqttBridge.addRoute(
-        'test/posts/get',
-        'http://http-server/posts',
-        {
-          method: 'get',
-          responseTopic: 'test/posts/response'
-        }
-      )
-      mqttBridge.addRoute(
-        'test/comments/get',
-        'http://http-server/comments',
-        {
-          method: 'get',
-          responseTopic: 'test/comments/response'
-        }
-      )
-      mqttBridge.addRoute(
-        'test/users/get',
-        'http://http-server/users',
-        {
-          method: 'get',
-          responseTopic: 'test/users/response'
-        }
-      )
+    it('should be possible to create a connection from a config file', async () => {
+      await mqttBridge.connectWithConfig('/app/test/fixtures/config.yml')
 
       const routes = mqttBridge.getRoutes()
       assert.deepEqual(Object.keys(routes), [
@@ -97,14 +45,15 @@ describe('MqttBridge integration test', () => {
         'test/users/post',
         'test/posts/get',
         'test/comments/get',
-        'test/users/get'
+        'test/users/get',
+        'test/dynamic'
       ])
     })
 
-    it('should be possible to pass custom callbacks for get calls', async () => {
+    it('should be possible to create custom callbacks', async () => {
       mqttClientHost.count = 0
 
-      mqttBridge.subscribe(['apple'])
+      // add a new route with custom callback
       mqttBridge.addRoute(
         'apple',
         'http://http-server/apple',
@@ -164,6 +113,26 @@ describe('MqttBridge integration test', () => {
       assert.equal(mqttClientHost.responses.posts.length, 3)
       assert.equal(mqttClientHost.responses.comments.length, 4)
       assert.equal(mqttClientHost.responses.users.length, 5)
+    })
+
+    it('should be possible to bridge dynamic calls', async () => {
+      mqttClientHost.count = 0
+
+      // put request on posts/1
+      await mqttClientHost.client.publish('test/dynamic', JSON.stringify({ method: 'put', url: 'http://http-server/posts/1', data: { id: 1, body: 'newText' } }))
+      // delete request on posts/3
+      await mqttClientHost.client.publish('test/dynamic', JSON.stringify({ method: 'delete', url: 'http://http-server/posts/3' }))
+
+      // Get
+      await mqttClientHost.client.publish('test/posts/get', '')
+
+      // Wait for GET requests to resolve
+      while (mqttClientHost.count < 1) {
+        await delay(100)
+      }
+
+      assert.equal(mqttClientHost.responses.posts.length, 2)
+      assert.equal(mqttClientHost.responses.posts[0].body, 'newText')
     })
   })
 })

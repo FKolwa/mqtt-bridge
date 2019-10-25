@@ -7,13 +7,11 @@ class MqttBridge {
   constructor () {
     this._mqttHost = ''
     this._mqttOptions = {}
-    this._httpHost = ''
     this._routingTable = new Map()
     this._client = {}
     this._state = {
       config: {},
-      mqttConnected: false,
-      httpConnected: false
+      mqttConnected: false
     }
   }
 
@@ -25,16 +23,14 @@ class MqttBridge {
     }
     const mqttHost = this._state.config.mqttHost ? this._state.config.mqttHost : ''
     const mqttOptions = this._state.config.mqttOptions ? this._state.config.mqttOptions : {}
-    const httpHost = this._state.config.httpHost ? this._state.config.httpHost : ''
-    const connected = await this.connect(mqttHost, httpHost, mqttOptions)
-    if (connected) {
-      this._routingTable = this._state.config.routes ? this._routesFromConfig(this._state.config.routes) : new Map()
+    await this.connect(mqttHost, mqttOptions)
+    if (this._state.config.routes) {
+      this._routesFromConfig(this._state.config.routes)
     }
   }
 
-  async connect (mqttHost = 'mqtt://localhost', httpHost = 'http://localhost', options = {}) {
+  async connect (mqttHost = 'mqtt://localhost', options = {}) {
     this._mqttHost = mqttHost
-    this._httpHost = httpHost
     this._mqttOptions = options
     try {
       this._client = await mqtt.connect(this._mqttHost, this._mqttOptions)
@@ -44,22 +40,15 @@ class MqttBridge {
     } catch (error) {
       console.error(`Error connecting to to ${mqttHost}: ${error}`)
     }
-
-    try {
-      await axios.get(this._httpHost)
-      this._state.httpConnected = true
-      console.debug('HTTP connection established!')
-    } catch (error) {
-      console.error(`Error connecting to to ${this._httpHost}: ${error}`)
-    }
-    return this._state.mqttConnected && this._state.httpConnected
   }
 
   addRoute (topic, route, options = {}) {
+    this._subscribe(topic)
     this._routingTable[topic] = {
       route: route,
       responseTopic: options.responseTopic !== undefined ? options.responseTopic : `${topic}/response`,
       method: options.method !== undefined ? options.method : 'get',
+      dynamic: options.dynamic !== undefined ? options.dynamic : false,
       callback: options.callback !== undefined ? options.callback : this._defaultCallback
     }
   }
@@ -68,31 +57,21 @@ class MqttBridge {
     return this._routingTable
   }
 
-  subscribe (topics) {
-    for (const topic of topics) {
-      console.debug(`Subscribing to: ${topic}`)
-      this._client.subscribe(topic, (error) => {
-        if (error) {
-          console.error(`Error subscribing to ${topic}: ${error}`)
-        } else {
-          console.debug(`Subscribing to ${topic}: Success!`)
-        }
-      })
-    }
+  _subscribe (topic) {
+    console.debug(`Subscribing to: ${topic}`)
+    this._client.subscribe(topic, (error) => {
+      if (error) {
+        console.error(`Error subscribing to ${topic}: ${error}`)
+      } else {
+        console.debug(`Subscribing to ${topic}: Success!`)
+      }
+    })
   }
 
   _routesFromConfig (config) {
-    const routingTable = new Map()
-    for (const item in config) {
-      this.subscribe([item])
-      routingTable[item] = {
-        route: config[item].route,
-        responseTopic: config[item].responseTopic !== undefined ? config[item].responseTopic : `${item}/response`,
-        method: config[item].method !== undefined ? config[item].method : 'get',
-        callback: config[item].callback !== undefined ? config[item].callback : this._defaultCallback
-      }
+    for (const topic in config) {
+      this.addRoute(topic, config[topic].route, config[topic])
     }
-    return routingTable
   }
 
   _connectionHandler () {
@@ -104,28 +83,36 @@ class MqttBridge {
     if (this._routingTable[topic] === undefined) {
       console.error(`Error: no route found for topic ${topic}!`)
     } else {
-      const body = {
-        method: this._routingTable[topic].method,
-        url: this._routingTable[topic].route
-      }
-
-      if (body.method === 'post' ||
-          body.method === 'put' ||
-          body.method === 'delete') {
-        body.data = { ...JSON.parse(payload) }
-      }
+      console.log(payload)
+      const request = this._routingTable[topic].dynamic
+        ? JSON.parse(payload)
+        : this._createRequest(topic, payload)
 
       try {
         const response = await axios({
-          ...body
+          ...request
         })
-        if (body.method === 'get') {
+        if (request.method === 'get') {
           this._routingTable[topic].callback(this._client, this._routingTable[topic].responseTopic, response.data)
         }
       } catch (error) {
-        console.error(`Error reaching target ${body.url}: ${error}`)
+        console.error(`Error reaching target ${request.url}: ${error}`)
       }
     }
+  }
+
+  _createRequest (topic, payload) {
+    const request = {
+      method: this._routingTable[topic].method,
+      url: this._routingTable[topic].route
+    }
+
+    if (request.method === 'post' ||
+        request.method === 'put' ||
+        request.method === 'delete') {
+      request.data = { ...JSON.parse(payload) }
+    }
+    return request
   }
 
   _errorHandler (error) {

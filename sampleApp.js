@@ -9,9 +9,6 @@ async function startServer () {
   // load a sample configuration
   await bridge.connectWithConfig('./config.yml')
 
-  // add something extra
-  await bridge.subscribe(['cucumber'])
-
   // Add a route with callback function
   await bridge.addRoute(
     'cucumber',

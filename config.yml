@@ -1,26 +1,26 @@
 ---
-# sample configuration for MqttBridge
+# sample configuration for MqttBridge change mqtt and http host names to fit
+# your configuration.
+############################################################################
+# INFO:
+# - jsonplaceholder.com provides dummy rest endpoints for testing.
+# - It is currently not possible to define custom callbacks in the yaml config
+#   to avoid injection of malicious code.
 mqttHost: 'mqtt://localhost'
-httpHost: 'https://jsonplaceholder.typicode.com'
 routes:
-  test/posts/post:
-    route: 'http://http-server/posts'
-    method: 'post'
-  test/comments/post:
-    route: 'http://http-server/comments'
-    method: 'post'
-  test/users/post:
-    route: 'http://http-server/users'
-    method: 'post'
-  test/posts/get:
-    route: 'http://http-server/posts'
+  # this route will respond on the default topic example/topic/response
+  example/topic/get:
+    route: 'https://jsonplaceholder.typicode.com/albums/1'
     method: 'get'
-    responseTopic: 'test/posts/response'
-  test/comments/get:
-    route: 'http://http-server/comments'
+  # this route will publish any response on custom/topic/response
+  example/topic/custom/get:
+    route: 'https://jsonplaceholder.typicode.com/albums/2'
+    responseTopic: 'custom/topic/response'
     method: 'get'
-    responseTopic: 'test/comments/response'
-  test/users/get:
-    route: 'http://http-server/users'
-    method: 'get'
-    responseTopic: 'test/users/response'
+  # example for post
+  example/topic/post:
+    route: 'https://jsonplaceholder.typicode.com/albums'
+    method: 'post'
+  # example for dynamic routing
+  example/topic/dynamic:
+    dynamic: true

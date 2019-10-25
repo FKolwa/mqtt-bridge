@@ -1,40 +1,31 @@
 #!/bin/bash
 
-# Make sure the script runs in the directory in which it is placed
-DIR=$(dirname `[[ $0 = /* ]] && echo "$0" || echo "$PWD/${0#./}"`)
-cd $DIR
+# Change into containing folder to assure relative paths resolve
+CURRENT_DIR=$(dirname `[[ $0 = /* ]] && echo "$0" || echo "$PWD/${0#./}"`)
+cd $CURRENT_DIR
 
-# Create project name using current time
-RAND=$(cat /dev/urandom | env LC_CTYPE=C tr -dc '0-9' | fold -w 8 | head -n 1)
-PROJECT=ci${RAND}
-
-# Extract name of project (= microservice name)
-SERVICE=${DIR%%/test/*}
-SERVICE=${SERVICE##*/}
-
-# kill and remove any running containers
-cleanup () {
-  docker-compose -p ${PROJECT} down -t 0
-}
+# Random prefix to avoid overlaps
+PROJECT=$RANDOM
+NAME=${CURRENT_DIR%%/test/*}
+NAME=${PROJECT}_${NAME##*/}_1
 
 # run the composed services
 docker-compose build && docker-compose -p ${PROJECT} up -d
 if [ $? -ne 0 ] ; then
-  printf "${RED}Docker Compose Failed (${SERVICE})${NC}\n"
+  printf "\033[0;31mDocker Compose Failed\033[0m\n"
   exit -1
 fi
 
-docker logs -f ${PROJECT}_${SERVICE}_1
+docker logs -f ${NAME}
 
-TEST_EXIT_CODE=`docker inspect ${PROJECT}_${SERVICE}_1 --format='{{.State.ExitCode}}'`
+EXIT_CODE=`docker inspect ${NAME} --format='{{.State.ExitCode}}'`
 
-# inspect the output of the test and display respective message
-if [ -z ${TEST_EXIT_CODE+x} ] || [ "$TEST_EXIT_CODE" != "0" ] ; then
-  printf "Tests Failed - Exit Code: $TEST_EXIT_CODE\n"
+if [ -z ${EXIT_CODE+x} ] || [ "$EXIT_CODE" != "0" ] ; then
+  printf "\033[0;31mTests Failed - Exit Code: $EXIT_CODE\033[0m\n"
 else
-  printf "Tests Passed\n"
+  printf "\033[0;32mTests Passed\033[0m\n"
 fi
 # Cleanup
-cleanup
+docker-compose -p ${PROJECT} down -t 0
 # exit the script with the same code as the test service code
-exit $TEST_EXIT_CODE
+exit $EXIT_CODE

@@ -1,26 +1,29 @@
 ---
-# sample configuration for MqttBridge
+# test configuration for MqttBridge
 mqttHost: 'mqtt://mqtt-broker'
 httpHost: 'http://http-server'
 routes:
-  - test/posts/post:
-      route: 'http://http-server/posts'
-      method: 'post'
-  - test/comments/post:
-      route: 'http://http-server/comments'
-      method: 'post'
-  - test/users/post:
-      route: 'http://http-server/users'
-      method: 'post'
-  - test/posts/get:
-      route: 'http://http-server/posts'
-      method: 'get'
-      responseTopic: 'test/posts/response'
-  - test/comments/get:
-      route: 'http://http-server/comments'
-      method: 'get'
-      responseTopic: 'test/comments/response'
-  - test/users/get:
-      route: 'http://http-server/users'
-      method: 'get'
-      responseTopic: 'test/users/response'
+  test/posts/post:
+    route: 'http://http-server/posts'
+    method: 'post'
+  test/comments/post:
+    route: 'http://http-server/comments'
+    method: 'post'
+  test/users/post:
+    route: 'http://http-server/users'
+    method: 'post'
+  test/posts/get:
+    route: 'http://http-server/posts'
+    method: 'get'
+    responseTopic: 'test/posts/response'
+  test/comments/get:
+    route: 'http://http-server/comments'
+    method: 'get'
+    responseTopic: 'test/comments/response'
+  test/users/get:
+    route: 'http://http-server/users'
+    method: 'get'
+    responseTopic: 'test/users/response'
+  test/dynamic:
+    responseTopic: 'test/dynamic/response'
+    dynamic: true
