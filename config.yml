@@ -1,11 +1,11 @@
 ---
-# sample configuration for MqttBridge change mqtt and http host names to fit
-# your configuration.
+# sample configuration for MqttBridge. Changevalues to fit your configuration.
 ############################################################################
 # INFO:
 # - jsonplaceholder.com provides dummy rest endpoints for testing.
-# - It is currently not possible to define custom callbacks in the yaml config
-#   to avoid injection of malicious code.
+# - It is not possible to define custom callbacks in the yaml config to avoid
+#   injection of malicious code.
+# - Dynamic routes expect a valid request body as message payload.
 mqttHost: 'mqtt://localhost'
 routes:
   # this route will respond on the default topic example/topic/response
