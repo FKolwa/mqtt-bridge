@@ -19,7 +19,7 @@ class MqttBridge {
     } catch (error) {
       console.error(`Error loading config file from ${configPath}: ${error}`)
     }
-    const mqttHost = this._state.config.mqttHost ? this._state.config.mqttHost : ''
+    const mqttHost = this._state.config.mqttHost ? this._state.config.mqttHost : 'mqtt://localhost'
     const mqttOptions = this._state.config.mqttOptions ? this._state.config.mqttOptions : {}
     await this._setupConnection(mqttHost, mqttOptions)
     while (!this._state.mqttConnected) {

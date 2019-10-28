@@ -4,10 +4,13 @@ A MQTT to REST bridge.
 
 How to install
 --------------
+
 **Node**
+
 Just run `npm install` from the main directory of this repository.
 
 **Docker**
+
 Build the Dockerfile contained in the main directory by running `docker build .
 -t mqtt-broker`.
 
@@ -17,19 +20,31 @@ The easiest way to configure individual mqtt to REST mappings is by defining
 routes in the config file.
 
 **config.yml structure**
+
 The config file consists of three main properties:
 - mqttHost
 - mqttOptions
 - routes
 
 **mqttHost**
+
+    Type: String
+    Default: 'mqtt://localhost'
+
 This sets the host address of the mqtt broker.
 
 **mqttOptions (optional)**
+
+    Type: Object
+    Default: {}
+
 Additional options that are passed to the mqtt client running in the
-brackground.
+brackground. For more information about the mqtt client options see the [mqtt
+node
+documentation](https://www.npmjs.com/package/mqtt#mqttclientstreambuilder-options).
 
 **routes**
+
 The routing definition that maps mqtt topics to REST calls.
 A route definition follows this structure:
 
@@ -40,6 +55,10 @@ A route definition follows this structure:
       responseTopic: '<STRING>'
 
 *dynamic*
+
+    Type: Boolean
+    Default: False
+
 Dynamic routes execute flexible REST calls based on individual mqtt messages.
 These routes ignore the method and route properties and create requests based on
 their message payload.
@@ -49,16 +68,28 @@ Mosquitto example:
     mosquitto_pub -h localhost -t example/topic/dynamic -m '{"method": "get", "url": "https://jsonplaceholder.typicode.com/albums/1"}'
 
 *route*
+
+    Type: String
+    Default: Empty
+
 Defines the REST endpoint.
 
 *method*
-REST method:
+
+    Type: String
+    Default: 'get'
+
+Either REST method:
 - 'get'
 - 'post'
 - 'put'
 - 'delete'
 
 *responseTopic*
+
+    Type: String
+    Default: '<TOPIC_NAME>/response'
+
 If set the REST response is published on this topic.
 If not set the response is published on the topic `<TOPIC_NAME>/response`.
 
@@ -89,13 +120,16 @@ You can find this example configuration in `./config.yml`.
 
 How to run
 ----------
+
 **Node**
+
 Run `node index.js`.
 Info:
 The example app in index.js expects a config.yml file located in the main
 directory.
 
 **Docker**
+
 Run the previously build docker image.
 Example: `docker run --net=host mqtt-bridge`
 
