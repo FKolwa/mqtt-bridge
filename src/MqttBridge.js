@@ -5,8 +5,6 @@ const fs = require('fs')
 
 class MqttBridge {
   constructor () {
-    this._mqttHost = ''
-    this._mqttOptions = {}
     this._routingTable = new Map()
     this._client = {}
     this._state = {
@@ -15,7 +13,7 @@ class MqttBridge {
     }
   }
 
-  async connectWithConfig (configPath) {
+  async connect (configPath) {
     try {
       this._state.config = yaml.safeLoad(fs.readFileSync(configPath, 'utf8'))
     } catch (error) {
@@ -23,18 +21,18 @@ class MqttBridge {
     }
     const mqttHost = this._state.config.mqttHost ? this._state.config.mqttHost : ''
     const mqttOptions = this._state.config.mqttOptions ? this._state.config.mqttOptions : {}
-    await this.connect(mqttHost, mqttOptions)
-    if (this._state.config.routes) {
-      this._routesFromConfig(this._state.config.routes)
+    await this._setupConnection(mqttHost, mqttOptions)
+    while (!this._state.mqttConnected) {
+      console.log('Connecting..')
+      await this._delay(1000)
     }
   }
 
-  async connect (mqttHost = 'mqtt://localhost', options = {}) {
-    this._mqttHost = mqttHost
-    this._mqttOptions = options
+  async _setupConnection (mqttHost, options = {}) {
     try {
-      this._client = await mqtt.connect(this._mqttHost, this._mqttOptions)
+      this._client = await mqtt.connect(mqttHost, options)
       this._client.on('connect', () => this._connectionHandler())
+      this._client.on('close', () => this._disconnectionHandler())
       this._client.on('message', (topic, payload) => this._messageHandler(topic, payload))
       this._client.on('error', (error) => this._errorHandler(error))
     } catch (error) {
@@ -57,6 +55,10 @@ class MqttBridge {
     return this._routingTable
   }
 
+  getConfig () {
+    return this._state.config
+  }
+
   _subscribe (topic) {
     console.debug(`Subscribing to: ${topic}`)
     this._client.subscribe(topic, (error) => {
@@ -64,6 +66,17 @@ class MqttBridge {
         console.error(`Error subscribing to ${topic}: ${error}`)
       } else {
         console.debug(`Subscribing to ${topic}: Success!`)
+      }
+    })
+  }
+
+  _unsubscribe (topic) {
+    console.debug(`Removing subscription to: ${topic}`)
+    this._client.subscribe(topic, (error) => {
+      if (error) {
+        console.error(`Error unsubscribing from ${topic}: ${error}`)
+      } else {
+        console.debug(`Subscription to ${topic} removed!`)
       }
     })
   }
@@ -76,7 +89,19 @@ class MqttBridge {
 
   _connectionHandler () {
     console.info('MQTT Connection established!')
+    if (this._state.config.routes) {
+      this._routesFromConfig(this._state.config.routes)
+    }
     this._state.mqttConnected = true
+  }
+
+  _disconnectionHandler () {
+    console.info('MQTT Connection lost!')
+    for (const topic in this._routingTable) {
+      this._unsubscribe(topic)
+      this._routingTable.delete(topic)
+    }
+    this._routingTable = new Map()
   }
 
   async _messageHandler (topic, payload) {
@@ -122,6 +147,12 @@ class MqttBridge {
   async _defaultCallback (mqttClient, topic, payload) {
     console.debug(`Publishing response on topic ${topic}`)
     await mqttClient.publish(topic, JSON.stringify(payload))
+  }
+
+  async _delay (t) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, t)
+    })
   }
 }
 

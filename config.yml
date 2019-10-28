@@ -5,7 +5,9 @@
 # - jsonplaceholder.com provides dummy rest endpoints for testing.
 # - It is not possible to define custom callbacks in the yaml config to avoid
 #   injection of malicious code.
-# - Dynamic routes expect a valid request body as message payload.
+# - Dynamic routes expect a valid request body in JSON format as message
+#   payload. i.e.: mosquitto_pub -h localhost -t example/topic/dynamic -m '{
+#   "method": "get", "url": "https://jsonplaceholder.typicode.com/albums/1"}'
 mqttHost: 'mqtt://localhost'
 routes:
   # this route will respond on the default topic example/topic/response

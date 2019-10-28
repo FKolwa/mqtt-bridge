@@ -29,14 +29,13 @@ describe('MqttBridge integration test', () => {
       mqttClientHost.count += 1
     })
 
-    // init mqtt bridge
-    mqttBridge = new MqttBridge()
-    await mqttBridge.connect('mqtt://mqtt-broker')
   })
 
   describe('Given a running mqtt-client, broker and http-server', () => {
     it('should be possible to create a connection from a config file', async () => {
-      await mqttBridge.connectWithConfig('/app/test/fixtures/config.yml')
+      // init mqtt bridge
+      mqttBridge = new MqttBridge()
+      await mqttBridge.connect('/app/test/fixtures/config.yml')
 
       const routes = mqttBridge.getRoutes()
       assert.deepEqual(Object.keys(routes), [
