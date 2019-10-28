@@ -65,6 +65,7 @@ their message payload.
 If a route is defined as dynamic the mqtt-bridge expects a valid request body in
 JSON format as `STRING` payload.
 Mosquitto example:
+
     mosquitto_pub -h localhost -t example/topic/dynamic -m '{"method": "get", "url": "https://jsonplaceholder.typicode.com/albums/1"}'
 
 *route*
