@@ -108,7 +108,6 @@ class MqttBridge {
     if (this._routingTable[topic] === undefined) {
       console.error(`Error: no route found for topic ${topic}!`)
     } else {
-      console.log(payload)
       const request = this._routingTable[topic].dynamic
         ? JSON.parse(payload)
         : this._createRequest(topic, payload)
