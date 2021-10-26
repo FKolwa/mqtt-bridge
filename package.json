@@ -21,7 +21,7 @@
   },
   "homepage": "https://github.com/FKolwa/mqtt-bridge#readme",
   "dependencies": {
-    "axios": "^0.21.1",
+    "axios": "^0.21.2",
     "fs": "0.0.1-security",
     "js-yaml": "^3.13.1",
     "mqtt": "^3.0.0"
